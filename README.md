@@ -5,8 +5,9 @@
 ## API code snippets
  - You can re-use this code 
 	 - to define the API methods and describe the request/response data structures
-	 - cover some action with Peppol infrastructure (lookup, validations of the documents)
+	 - cover some actions with Peppol infrastructure (lookup, validations of the documents)
  - **NOTE:** it does not contain the connection to the AP infrastructure. It should be done individually for the exact AP (data mappings, internal messages and etc.).
+ - The UAT version of this API is hosted by the following url: https://euroconnector-uat.unifiedpost.com/api/public/index.html
  
 ## Alternative API code snippets
  - Open the link https://app.swaggerhub.com/apis/euroconnector/econ-def
