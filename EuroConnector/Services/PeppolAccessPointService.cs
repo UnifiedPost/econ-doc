@@ -75,6 +75,41 @@ namespace EuroConnector.API.Services
             throw new NotImplementedException();
         }
 
+        public async Task<Result<EntityLookupResponseDto>> PeppolLookup(string participantId)
+        {
+            var md5 = Helper.GetMD5ForString(participantId.ToLower());
+
+            var serviceGroup = string.Empty;
+            try
+            {
+                serviceGroup = await _peppolLookupClient.GetServiceGroup(md5, participantId);
+            }
+            catch (HttpRequestException)
+            {
+                return new KnownErrors.GeneralErrors().BadRequest;
+            }
+            catch (Exception ex)
+            {
+                return new Error(ex.Message, 400);
+            }
+
+            var businessCard = await _peppolLookupClient.GetBusinessCard(md5, participantId);
+            if (string.IsNullOrEmpty(businessCard)) _logger.Information("Business card for {ParticipantId} was not found.", participantId);
+
+            try
+            {
+                var metadataUrl = GetMetadataUrlFromServiceGroup(serviceGroup);
+                var serviceMetadata = string.IsNullOrEmpty(metadataUrl) ? string.Empty : await _peppolLookupClient.GetServiceMetadata(metadataUrl);
+
+                return MapServiceMetadataToResponse(serviceGroup, serviceMetadata, businessCard);
+            }
+            catch (Exception)
+            {
+                return new KnownErrors.GeneralErrors().BadRequest;
+            }
+        }
+
+
         private string? GetMetadataUrlFromServiceGroup(string serviceGroupXml)
         {
             var xdoc = XDocument.Parse(serviceGroupXml);
