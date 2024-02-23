@@ -2,11 +2,18 @@
 using EuroConnector.API.DTOs.Entities;
 using EuroConnector.API.Infrastructure.Objects;
 using EuroConnector.API.DTOs.PeppolServices.PeppolAccessPoint;
+using EuroConnector.API.DTOs.Users;
 using EuroConnector.API.UOW;
 using EuroConnector.Data.Contract;
+using EuroConnector.Data.Models;
 using ValueHasher;
 using ILogger = Serilog.ILogger;
+using EuroConnector.API.DTOs.PeppolServices;
+using EuroConnector.API.Infrastructure.Helpers;
 using EuroConnector.API.Clients;
+using System.Xml.Linq;
+using System.Xml;
+using System.Xml.XPath;
 
 namespace EuroConnector.API.Services
 {
@@ -67,5 +74,50 @@ namespace EuroConnector.API.Services
         {
             throw new NotImplementedException();
         }
+
+        private string? GetMetadataUrlFromServiceGroup(string serviceGroupXml)
+        {
+            var xdoc = XDocument.Parse(serviceGroupXml);
+
+            var element = xdoc.XPathSelectElement("./*[local-name() = \"ServiceGroup\"]/*[local-name() = \"ServiceMetadataReferenceCollection\"]/*[local-name() = \"ServiceMetadataReference\"]");
+            var href = element?.Attribute("href")?.Value;
+
+            return href;
+        }
+
+        private EntityLookupResponseDto MapServiceMetadataToResponse(string serviceGroupXml, string serviceMetadataXml, string businessCardXml)
+        {
+            var serviceGroup = XDocument.Parse(serviceGroupXml);
+            XDocument? serviceMetadata = null;
+            XDocument? businessCard = null;
+            if (!string.IsNullOrEmpty(businessCardXml)) businessCard = XDocument.Parse(businessCardXml);
+            if (!string.IsNullOrEmpty(serviceMetadataXml)) serviceMetadata = XDocument.Parse(serviceMetadataXml);
+
+            var participantIdElement = serviceGroup.XPathSelectElement("./*[local-name() = \"ServiceGroup\"]/*[local-name() = \"ParticipantIdentifier\"]");
+            var businessEntityElement = businessCard?.XPathSelectElement("./*[local-name() = \"BusinessCard\"]/*[local-name() = \"BusinessEntity\"]");
+
+            var accessPoint = serviceMetadata?
+                        .XPathSelectElement("./*[local-name() = \"SignedServiceMetadata\"]/*[local-name() = \"ServiceMetadata\"]/*[local-name() = \"ServiceInformation\"]/*[local-name() = \"ProcessList\"]/*[local-name() = \"Process\"]/*[local-name() = \"ServiceEndpointList\"]/*[local-name() = \"Endpoint\"]/*[local-name() = \"ServiceDescription\"]")!
+                        .Value;
+            var endpointSchemeId = participantIdElement!.Value.Split(":")[0];
+            var participantId = participantIdElement!.Value;
+            var participantIdentifierSchemeId = participantIdElement!.Attribute("scheme")!.Value;
+            var createdAt = businessEntityElement?.Attribute("registrationDate")?.Value;
+
+            return new()
+            {
+                PeppolService = new()
+                {
+                    AccessPoint = accessPoint,
+                    EndpointSchemeId = endpointSchemeId,
+                    ParticipantId = participantId,
+                    ParticipantIdentifierSchemeId = participantIdentifierSchemeId,
+                    Status = "active",
+                    IsEnabled = true,
+                    CreatedAt = createdAt
+                }
+            };
+        }
+
     }
 }
